@@ -21,11 +21,15 @@
 __author__ = 'stephan.adig'
 
 from .xenservercollection import XenServerCollection
+from .xenservercollection import XenServerEntries
+from .xendashboard import  XenCollection
+from .xendashboard import XenServerData
 
 def init_versioned_endpoints(bp_api=None):
     if bp_api is None:
         raise ValueError('bp_api can not be None')
-    bp_api.add_resource(XenServerCollection, '/v1/servers')
-    # bp_api.add_resource(IPNetworkInfos, '/v1/ipnetworks/info')
-    # bp_api.add_resource(IPNetworkCollection, '/v1/ipnetworks')
-    # bp_api.add_resource(HostEntryCollection, '/v1/hostentries')
+    bp_api.add_resource(XenServerCollection, '/v1/admin/servers')
+    bp_api.add_resource(XenServerEntries, '/v1/admin/servers/<int:id>')
+    bp_api.add_resource(XenCollection, '/v1/servers')
+    bp_api.add_resource(XenServerData, '/v1/servers/<int:id>')
+

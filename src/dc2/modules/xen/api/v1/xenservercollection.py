@@ -39,13 +39,16 @@ except ImportError as e:
 
 try:
     from ...db.models import XenServer
+    from dc2.core.modules.usersgroups.db.models import User
 except ImportError as e:
     raise(e)
 
-# _hostentry_parser = RequestParser()
-# _hostentry_parser.add_argument('hostname', type=str, required=True, location="json")
-# _hostentry_parser.add_argument('ipaddress', type=str, required=True, location="json")
-# _hostentry_parser.add_argument('ipnetwork', type=str, required=True, location="json")
+_xenserver_parser = RequestParser()
+_xenserver_parser.add_argument('title', dest='title', type=str, required=True, location='json')
+_xenserver_parser.add_argument('hostname', dest='hostname', type=str, required=True, location='json')
+_xenserver_parser.add_argument('port', dest='port', type=int, required=True, location='json')
+_xenserver_parser.add_argument('username', dest='username', type=str, required=True, location='json')
+_xenserver_parser.add_argument('password', dest='password', default=None, type=str, required=False, location='json')
 
 class XenServerCollection(RestResource):
 
@@ -54,29 +57,87 @@ class XenServerCollection(RestResource):
         # self._ctl_hostentries = HostEntryController(DB.session)
 
     @needs_authentication
-    @has_groups(['admin','users'])
+    @has_groups(['admin'])
     def get(self):
-        xenserverlist = XenServer.query().all()
-        if hostentrylist is not None:
-            return [entry.to_dict for entry in hostentrylist], 200
-        return [], 200
+        try:
+            xenserverlist = XenServer.query.all()
+            if xenserverlist is not None:
+                return [entry.to_dict for entry in xenserverlist], 200
+        except Exception as e:
+            app.logger.exception(msg='Exception occured')
+            return None, 404
 
     @needs_authentication
-    @has_groups(['admin','users'])
+    @has_groups(['admin'])
     def post(self):
-        args = _hostentry_parser.parse_args()
+        args = _xenserver_parser.parse_args()
         if g.auth_user is not None:
             try:
-                hostentry, ipaddress = self._ctl_hostentries.new_with_ipaddress(hostname=args.hostname, ipaddress=args.ipaddress, ipnetwork=args.ipnetwork, username=g.auth_user)
-                if hostentry is not None and ipaddress is not None:
-                    return {
-                        'hostname': hostentry.hostname,
-                        'ipaddress': ipaddress.ipaddress
-                    }, 200
+                user = User.query.filter_by(username=g.auth_user).first()
+                xen_rec = XenServer()
+                xen_rec.title = args.title
+                xen_rec.hostname = args.hostname
+                xen_rec.port = args.port
+                xen_rec.username = args.username
+                xen_rec.password = args.password
+                xen_rec.created_by = user
+                DB.session.add(xen_rec)
+                DB.session.commit()
+                print(xen_rec.to_dict)
+                return xen_rec.to_dict, 200
             except Exception as e:
                 app.logger.exception(msg="Exception occured")
-                return {'error': True, 'message': lookup_error(error_code=e.orig.pgcode, format_entries=[e.orig.diag.message_primary])}, 400
-        return {'error': True, 'message': 'Something went wrong'}, 400
+                return {'error': True, 'message': "An Error Occured"}, 400
 
 
+class XenServerEntries(RestResource):
+    def __init__(self, *args, **kwargs):
+        super(XenServerEntries, self).__init__(*args, **kwargs)
 
+    @needs_authentication
+    @has_groups(['admin'])
+    def put(self, id=None):
+        try:
+            if g.auth_user is not None and id is not None:
+                args = _xenserver_parser.parse_args()
+                user = User.query.filter_by(username=g.auth_user).first()
+                entry = XenServer.query.filter_by(id=id).first()
+                print(entry.to_dict)
+                entry.title = args.title
+                entry.hostname = args.hostname
+                entry.port = args.port
+                entry.username = args.username
+                entry.password = args.password
+                entry.updated_by = user
+                DB.session.commit()
+                return entry.to_dict, 200
+            else:
+                return {'error': True, 'message': 'No ID given'}, 400
+        except Exception as e:
+            app.logger.exception(msg='An Exception Occured')
+            return {'error': True, 'message': 'An Error Occured'}, 400
+
+    @needs_authentication
+    @has_groups(['admin'])
+    def get(self, id=None):
+        try:
+            entry = XenServer.query.filter_by(id=id).first()
+            return entry.to_dict, 200
+        except Exception as e:
+            app.logger.exception(msg="An Exception Occured")
+            return {'error': True, 'message': 'An Error Occured'}, 400
+
+    @needs_authentication
+    @has_groups(['admin'])
+    def delete(self, id=None):
+        try:
+            if id is not None:
+                entry = XenServer.query.filter_by(id=id).first()
+                DB.session.delete(entry)
+                DB.session.commit()
+                return {'error': False, 'message': 'Entry deleted'}, 200
+            else:
+                return {'error': True, 'message': 'No ID Given'}, 400
+        except Exception as e:
+            app.logger.exception(msg="Exception occured")
+            return {'error': True, 'message': "An Error Occured"}, 400

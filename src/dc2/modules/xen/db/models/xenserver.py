@@ -34,6 +34,7 @@ class XenServer(DB.Model):
     id = DB.Column(DB.Integer, primary_key=True)
     title = DB.Column(DB.String, nullable=False, unique=False)
     hostname = DB.Column(DB.String, nullable=False, unique=True)
+    port = DB.Column(DB.Integer, default=9600, nullable=True, unique=False)
     username = DB.Column(DB.String, nullable=False, unique=False)
     password = DB.Column(DB.String, nullable=False, unique=False)
     created_at = DB.Column(DB.DateTime, default=datetime.datetime.now())
@@ -43,10 +44,13 @@ class XenServer(DB.Model):
     created_by = DB.relationship("User", uselist=False, foreign_keys="XenServer.created_by_user_id")
     updated_by = DB.relationship("User", uselist=False, foreign_keys="XenServer.updated_by_user_id")
 
+    @property
     def to_dict(self):
         return dict(id=self.id,
                     title=self.title,
                     hostname=self.hostname,
+                    port=self.port,
+                    password=self.password,
                     username=self.username,
                     created_at=self.created_at.isoformat(),
                     updated_at=self.updated_at.isoformat() if self.updated_at is not None else None,
